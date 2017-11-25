@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title></title>
+  <style type="text/css">
+  	#wrapper{
+  		display: flex;
+  		justify-content: center;
+  		align-content: center;
+  		flex-wrap: wrap;
+  		padding-top: 60px;
+  	}
+  	.mediawrapper{
+  		display: inline-block;
+  		width: 30%;
+  		margin: 10px auto;
+  		padding: 5px;
+  		text-align: center;
+  		border-bottom: 1px solid #dddddd;
+  	}
+  	.mediawrapper img{
+  		max-width: 100%;
+  		height: 250px;
+  		border-radius: 10px;
+  	}
+  	.imageDescription{
+  		color: #616161;
+  		text-align: left;
+  	}
+  	#dropdownlist{
+  		width: 40%;
+	    height: 25px;
+	    background: black;
+	    left: 2%;
+	    color: white;
+	    top: 5%;
+	    display: inline-block;
+	    padding: 10px;
+  	}
+  	#dropdownlist select{
+  		height: 100%;
+  		width: 50%;
+  		margin-left: 10px;
+  	}
+  	#totalimages{
+	    background: red;
+	    color: white;
+	    min-width: 200px;
+	    line-height: 35px;
+	    padding: 5px;
+	    float: right;
+	    text-align: center;
+	    margin-right: 1%;
+  	}
+  	#loading{
+  		position: fixed;
+	    bottom: 0px;
+	    right: 10px;
+	    z-index: 2;
+  	}
+  	#loading img{
+  		width: 50px;
+  	}
+  	#topbar{
+  		position: fixed;
+  		top: 0px;
+  		width: 100%;
+  	}
+  	.content{
+  		position: relative;
+  	}
+  </style>
+</head>
+<body>
+	<div class="content">
+		<div id="topbar"> 
+		  <div id="dropdownlist">
+				<label>Images To Show at Once</label>
+				<select onchange="handleSelect()" id="totalimageSelect">
+				  <option value="24" selected="true">24</option>
+				  <option value="48">48</option>
+				  <option value="72">72</option>
+				  <option value="96">96</option>
+				</select>
+			</div>
+			<label id="totalimages"></label>
+		</div>
+		<div id="wrapper">
+		</div>
+		<div id="loading" style="display: none;">
+		  <img src="https://i.imgur.com/HFJnvyJ.gif"/>
+		</div>
+	</div>
+  <script type="text/javascript">
+
+  	//Globals to keep track of current page till which data has been loaded and total images to show
+    var page = 1;
+    var initialImageCount = 24;
+  	//Function to handle select
+		var handleSelect = function(){
+			initialImageCount = document.getElementById("totalimageSelect").value;
+		}
+
+    //Debounce function to prevent unnecessary firing of scroll event 
+    var debounce = function(func, wait) {
+	    var timeout;
+	    return function() {
+        var context = this, args = arguments;
+        var later = function() {
+            timeout = null;
+            func.apply(context, args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+	    };
+		};
+
+		//Function to dynamically create slides and append to the DOM
+  	var createImages = function(mediaFiles, callback){
+  		var media = mediaFiles;
+  		for(var i=0;i<media.length;i++){
+  			var currentMedia = media[i];
+  			var newDiv = document.createElement("div");
+  			var description = document.createElement("p");
+  			var text = document.createTextNode(currentMedia.description || 'weddings');
+  			description.setAttribute('class', 'imageDescription');
+  			description.appendChild(text);
+  			var imageElement = document.createElement("img");
+	      imageElement.setAttribute("src", currentMedia.url);
+	      newDiv.appendChild(imageElement); 
+	  		newDiv.appendChild(description);
+	  		newDiv.setAttribute('class', 'mediawrapper')
+	  		var currentDiv = document.getElementById("wrapper"); 
+	  		currentDiv.appendChild(newDiv);
+  		}
+  		callback();
+  	}
+
+  	//Function to fetch images from API
+    var getImages = function(pageNumber, callback){
+      var http = new XMLHttpRequest();
+      var url = "https://www.urbanclap.com/api/v1/seo_media/getSeoImages";
+      var params = JSON.stringify({
+        "url":"https://www.urbanclap.com/weddings/ideas/candid-photography",
+        "page_number":pageNumber,
+        "no_fetch_filters":false
+      });
+      http.open("POST", url, true);
+      http.setRequestHeader("Content-type", "application/json");
+      http.onreadystatechange = function() {
+          if(http.readyState == 4 && http.status == 200) {
+          	  var repsonse =  JSON.parse(http.responseText);
+          	  var mediaFiles = repsonse.success.data.media;
+          	  callback(mediaFiles);
+          }
+      }
+      http.send(params);
+    }
+
+    //Initial Loading the page with default page 1 with 24 slides
+    getImages(1, function(files){
+    	createImages(files,function(){
+    		document.getElementById('totalimages').innerHTML = document.querySelectorAll('.mediawrapper').length + ' slides are present on screen till page ' +  page;
+    	})
+    });
+
+    //Function to handle loading when end of window is reached
+    window.onscroll = debounce(function() {
+	    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight) {
+	    	// Display loading till the time data has not been loaded to screen
+	    	document.getElementById('loading').style.display = 'block';
+	    	var allmedia = [];
+	    	var pageNumber = [];
+
+	    	//calculate the pages to fetch the data
+	    	var number  = parseInt(initialImageCount/24,10);
+	    	for(var i = 1 ; i <= number ; i++){
+	    		pageNumber.push(page + i);
+	    	}
+
+	    	// Keep a local counter to count the number of async calls
+	    	var count = 0;
+	    	pageNumber.forEach(function(page_no){
+	    		getImages(page_no, function(files){
+		    		allmedia = allmedia.concat(files);
+		    		count ++;
+		    		if(count === pageNumber.length){ //All the async calls have been finished, handle the final callback
+		    			page = pageNumber.slice(-1)[0];
+		    			createImages(allmedia, function(){
+		    				document.getElementById('loading').style.display = 'none';
+		    				document.getElementById('totalimages').innerHTML = document.querySelectorAll('.mediawrapper').length + ' slides are present on screen till page ' +  page;
+		    			});
+		    		}
+		    	});
+		    })
+	    }
+		}, 100);
+  </script>
+</body>
+</html>
