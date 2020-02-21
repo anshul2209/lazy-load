@@ -1,5 +1,5 @@
 //Globals to keep track of current page till which data has been loaded and total images to show
-const page = 1;
+let page = 1;
 const initialImageCount = 24;
 const url = "https://www.urbanclap.com/api/v1/seo_media/getSeoImages";
 
@@ -74,8 +74,8 @@ window.onscroll = debounce(function () {
     if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight) {
         // Display loading till the time data has not been loaded to screen
         document.getElementById('loading').style.display = 'block';
-        const allmedia = [];
-        const pageNumber = [];
+        let allmedia = [];
+        let pageNumber = [];
 
         //calculate the pages to fetch the data
         const number = parseInt(initialImageCount / 24, 10);
